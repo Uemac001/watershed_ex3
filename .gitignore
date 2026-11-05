@@ -1,0 +1,21 @@
+# Data is not tracked: observed input (*.mat, zip) stays local,
+# WeaGETS output and future climate CSVs can be reproduced with the scripts
+Data_
+data
+*.mat
+*.csv
+*.zip
+
+# Python
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints
+.venv
+*.log
+
+# OS / editor
+.DS_Store
+.vscode
+
+# MATLAB
+*.asv

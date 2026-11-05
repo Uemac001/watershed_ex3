@@ -1,0 +1,11 @@
+# Windows / Python 3.13 (shared venv: ~/.venvs/watmod, Jupyter kernel "watmod")
+# pandas 3.x breaks resample("M") etc., so stay on 2.x
+numpy
+pandas>=2.2,<3
+scipy
+matplotlib
+seaborn
+statsmodels
+ipykernel
+ipywidgets
+nbconvert
