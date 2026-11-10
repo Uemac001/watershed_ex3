@@ -112,8 +112,17 @@ clear
 %% Basic input
 % basic inputs include names of input and output files, daily precipitation
 % threshold and a number of years for generated data
-filenamein=uigetfile('*.mat','Select an input filename');
-filenameout=uiputfile('*.mat','Enter an output filename');
+% Use full paths so the script works from any current folder
+here=fileparts(mfilename('fullpath'));
+addpath(here);
+datadir=fullfile(fileparts(fileparts(here)),'data');
+if ~isfolder(datadir), mkdir(datadir); end
+[f,p]=uigetfile(fullfile(here,'*_WEAGETS_IN.mat'),'Select an input filename');
+if isequal(f,0), error('No input file selected.'); end
+filenamein=fullfile(p,f);
+[f,p]=uiputfile(fullfile(datadir,strrep(f,'_WEAGETS_IN','_OUT')),'Enter an output filename');
+if isequal(f,0), error('No output file selected.'); end
+filenameout=fullfile(p,f);
 PrecipThreshold=inputdlg({'Enter a daily precipitation threshold:'},'Input:',[1 35],{'0.1'});
 PrecipThreshold=str2num(PrecipThreshold{1});
 GeneratedYears=inputdlg({'Enter the number of years to generate:'},'Input:',[1 35],{'30'});
