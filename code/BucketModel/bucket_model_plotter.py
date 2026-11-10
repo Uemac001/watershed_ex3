@@ -732,3 +732,5 @@ def plot_monthly_runoff_with_ci(
     plt.legend()
     sns.despine()
     plt.grid(linestyle="-", alpha=0.7)
+    if output_destination:
+        plt.savefig(output_destination, bbox_inches="tight", dpi=300)

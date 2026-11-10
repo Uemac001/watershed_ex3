@@ -85,6 +85,7 @@ class ClimateExtreme:
         self,
         ks_results: List[Tuple[float, float]],
         significance_threshold: float = 0.05,
+        output_destination: str = None,
     ):
         """
         Plots the p-value distribution from KS tests with a customizable significance threshold.
@@ -92,6 +93,7 @@ class ClimateExtreme:
         Args:
             ks_results (List[Tuple[float, float]]): The KS test results, where each tuple contains (KS statistic, p-value).
             significance_threshold (float): The p-value threshold for significance.
+            output_destination (str): File path to save the figure. If None, the plot is displayed instead.
         """
         # Extract p-values from the KS test results
         p_values = [result[1] for result in ks_results]
@@ -127,7 +129,10 @@ class ClimateExtreme:
 
         plt.tight_layout()
         sns.despine()
-        plt.show()
+        if output_destination:
+            plt.savefig(output_destination, bbox_inches="tight", dpi=300)
+        else:
+            plt.show()
 
     def plot_extreme_comparison(
         self,
