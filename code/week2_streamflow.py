@@ -115,6 +115,42 @@ def plot_monthly_boxplot(monthly: pd.DataFrame, output_destination: str | None =
     return table.round(1)
 
 
+def plot_monthly_band(monthly: pd.DataFrame, output_destination: str | None = None) -> pd.DataFrame:
+    """Mean monthly runoff, median and 5-95% over all realizations of each group
+    (present: 50; each RCP: 5 climate models x 50), so the bands include both the climate model
+    spread and the natural variability. Returns the plotted values."""
+    x = np.arange(1, 13)
+    fig, ax = plt.subplots(figsize=(11, 5))
+    rows = {}
+    for group in GROUPS:
+        values = monthly.xs(group, level="group")
+        q05, q50, q95 = values.quantile(0.05), values.median(), values.quantile(0.95)
+        ax.fill_between(x, q05.to_numpy(), q95.to_numpy(), color=COLORS[group], alpha=0.18, linewidth=0)
+        ax.plot(x, q50.to_numpy(), "-o", color=COLORS[group], linewidth=2, markersize=4,
+                label=f"{group_label_monthly(values, group)}: median and 5-95%")
+        for name, q in (("5%", q05), ("median", q50), ("95%", q95)):
+            rows[(group, name)] = q.to_numpy()
+    ax.set_xticks(x, MONTHS)
+    ax.set_ylabel("Mean monthly runoff [mm/month]")
+    ax.set_title("Mean monthly runoff: present vs 2070-2099")
+    ax.grid(axis="y", alpha=0.3)
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+    ax.legend(frameon=False)
+    fig.tight_layout()
+    if output_destination:
+        fig.savefig(output_destination, dpi=300, bbox_inches="tight")
+    return pd.DataFrame.from_dict(rows, orient="index", columns=MONTHS).round(1)
+
+
+def group_label_monthly(values: pd.DataFrame, group: str) -> str:
+    """Label from the realizations of one group (index: climate_model, sim)."""
+    if group == "Present":
+        return f"Present ({len(values)} realizations)"
+    per_model = values.groupby(level="climate_model").size()
+    return f"{group} ({len(per_model)} climate models × {per_model.iloc[0]} realizations)"
+
+
 def empirical_positions(annual_max: pd.DataFrame) -> pd.DataFrame:
     """Weibull plotting positions per realization: sorted maxima (largest first), T = (n+1)/rank."""
     sorted_values = -np.sort(-annual_max.to_numpy(), axis=1)
