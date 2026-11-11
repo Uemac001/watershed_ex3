@@ -3,8 +3,8 @@
 Runs the Bucket Model for the present WeaGETS ensemble and for the future (delta change) ensemble,
 keeps per realization the mean monthly runoff and the annual maximum daily runoff, and makes
 - plot_monthly_boxplot: mean monthly runoff, boxes = the 5 climate models per RCP, line = present ensemble
-- plot_return_periods: Gumbel fitted to the 30 annual maxima of each realization, median and 5-95% band
-  per group, with the median empirical (Weibull) plotting positions as points
+- plot_return_periods: empirical return periods of the annual maxima (Weibull plotting positions,
+  T = (n+1)/rank) of each 30-year realization, median and 5-95% band per rank and group
 """
 
 from pathlib import Path
@@ -12,7 +12,6 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from scipy.stats import gumbel_r
 
 from BucketModel import BucketModel
 from BucketModel.data_processing import preprocess_for_bucket_model, run_multiple_simulations
@@ -98,7 +97,7 @@ def plot_monthly_boxplot(monthly: pd.DataFrame, output_destination: str | None =
                    boxprops=dict(facecolor="white", edgecolor=COLORS[rcp], linewidth=1.5),
                    whiskerprops=dict(color=COLORS[rcp]), capprops=dict(color=COLORS[rcp]),
                    medianprops=dict(color=COLORS[rcp], linewidth=2), flierprops=dict(markeredgecolor=COLORS[rcp]))
-        ax.plot([], [], color=COLORS[rcp], linewidth=6, alpha=0.6, label=f"{rcp} (5 climate models)")
+        ax.plot([], [], color=COLORS[rcp], linewidth=6, alpha=0.6, label=f"{rcp} (5 climate models, each the mean of 50 realizations)")
     ax.plot(x, present.to_numpy(), color=COLORS["Present"], linewidth=2, marker="o", markersize=5,
             label="Present (WeaGETS ensemble)")
     ax.set_xticks(x, MONTHS)
@@ -116,16 +115,6 @@ def plot_monthly_boxplot(monthly: pd.DataFrame, output_destination: str | None =
     return table.round(1)
 
 
-def gumbel_quantiles(annual_max: pd.DataFrame, return_periods: np.ndarray) -> pd.DataFrame:
-    """Gumbel (maximum likelihood) fitted to each realization's annual maxima; quantile per return period."""
-    p = 1 - 1 / return_periods
-    rows = {}
-    for idx, values in annual_max.iterrows():
-        loc, scale = gumbel_r.fit(values.dropna().to_numpy())
-        rows[idx] = gumbel_r.ppf(p, loc, scale)
-    return pd.DataFrame.from_dict(rows, orient="index", columns=return_periods)
-
-
 def empirical_positions(annual_max: pd.DataFrame) -> pd.DataFrame:
     """Weibull plotting positions per realization: sorted maxima (largest first), T = (n+1)/rank."""
     sorted_values = -np.sort(-annual_max.to_numpy(), axis=1)
@@ -133,27 +122,31 @@ def empirical_positions(annual_max: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(sorted_values, index=annual_max.index, columns=(n + 1) / np.arange(1, n + 1))
 
 
-def plot_return_periods(annual_max: pd.DataFrame, max_return_period: float = 30,
-                        output_destination: str | None = None) -> pd.DataFrame:
-    """Return period plot of the annual maximum daily runoff for present, RCP4.5 and RCP8.5."""
-    T = np.geomspace(1.05, max_return_period, 60)
+def group_label(annual_max: pd.DataFrame, group: str) -> str:
+    """e.g. 'Present (50 realizations)' or 'RCP4.5 (5 climate models x 50 realizations)'."""
+    am = annual_max.xs(group, level="group")
+    if group == "Present":
+        return f"Present ({len(am)} realizations)"
+    per_model = am.groupby(level="climate_model").size()
+    return f"{group} ({len(per_model)} climate models \u00d7 {per_model.iloc[0]} realizations)"
+
+
+def plot_return_periods(annual_max: pd.DataFrame, output_destination: str | None = None) -> pd.DataFrame:
+    """Empirical return period plot of the annual maximum daily runoff for present, RCP4.5 and RCP8.5.
+
+    Each 30-year realization gives 30 points at T = (n+1)/rank = 31, 15.5, ..., 1.03 years (Weibull).
+    Line = median over the realizations of each rank, band = 5-95%."""
     fig, ax = plt.subplots(figsize=(8, 5.5))
     for group in GROUPS:
-        am = annual_max.xs(group, level="group")
-        q = gumbel_quantiles(am, T)
-        n_real = len(am)
-        ax.fill_between(T, q.quantile(0.05), q.quantile(0.95), color=COLORS[group], alpha=0.15, linewidth=0)
-        ax.plot(T, q.median(), color=COLORS[group], linewidth=2,
-                label=f"{group}: Gumbel, median and 5-95% ({n_real} realizations)")
-        emp = empirical_positions(am)
-        emp = emp.loc[:, emp.columns <= max_return_period * 1.05]
-        ax.plot(emp.columns, emp.median(), "o", color=COLORS[group], markersize=4, alpha=0.6)
-    ax.plot([], [], "o", color="#888888", markersize=4, label="Empirical (Weibull), median per rank")
+        emp = empirical_positions(annual_max.xs(group, level="group"))
+        T = emp.columns.to_numpy()
+        ax.fill_between(T, emp.quantile(0.05), emp.quantile(0.95), color=COLORS[group], alpha=0.15, linewidth=0)
+        ax.plot(T, emp.median(), "-o", color=COLORS[group], linewidth=1.8, markersize=3.5,
+                label=f"{group_label(annual_max, group)}: median and 5-95%")
     ax.set_xscale("log")
-    ticks = [t for t in (1, 2, 5, 10, 20, 30) if t <= max_return_period]
-    ax.set_xticks(ticks, [str(t) for t in ticks])
-    ax.set_xlim(1, max_return_period * 1.1)
-    ax.set_xlabel("Return period [years]")
+    ax.set_xticks([1, 2, 5, 10, 20, 30], ["1", "2", "5", "10", "20", "30"])
+    ax.set_xlim(1, 33)
+    ax.set_xlabel("Return period T = (n+1)/rank [years] (Weibull, n = 30)")
     ax.set_ylabel("Annual maximum daily runoff [mm/d]")
     ax.set_title("Annual maximum daily runoff: present vs 2070-2099")
     ax.grid(alpha=0.3, which="both")
@@ -194,19 +187,22 @@ def uncertainty_partition(annual_mean: pd.Series) -> pd.DataFrame:
     )
 
 
-def return_period_table(annual_max: pd.DataFrame, return_periods=(2, 10, 30)) -> pd.DataFrame:
-    """Median and 5-95% of the Gumbel quantiles, and the change of the median vs present."""
-    T = np.array(return_periods, dtype=float)
+def return_period_table(annual_max: pd.DataFrame, ranks=(15, 6, 3, 1)) -> pd.DataFrame:
+    """Empirical (Weibull) values at the given ranks: median and 5-95% over the realizations, and the
+    change of the median vs present. With n = 30 the ranks 15, 6, 3, 1 are T = 2.1, 5.2, 10.3, 31 years."""
     rows, present_median = [], None
     for group in GROUPS:
-        q = gumbel_quantiles(annual_max.xs(group, level="group"), T)
-        med = q.median()
+        emp = empirical_positions(annual_max.xs(group, level="group"))
+        n = emp.shape[1]
+        values = {r: emp.iloc[:, r - 1] for r in ranks}
+        med = {r: v.median() for r, v in values.items()}
         if group == "Present":
             present_median = med
-        for t in T:
+        for r, v in values.items():
             rows.append({
-                "Group": group, "T [years]": int(t), "Median [mm/d]": round(med[t], 1),
-                "5-95% [mm/d]": f"{q[t].quantile(0.05):.1f}-{q[t].quantile(0.95):.1f}",
-                "Change vs present [%]": round(100 * (med[t] / present_median[t] - 1), 1),
+                "Group": group_label(annual_max, group), "T [years]": round((n + 1) / r, 1),
+                "Median [mm/d]": round(med[r], 1),
+                "5-95% [mm/d]": f"{v.quantile(0.05):.1f}-{v.quantile(0.95):.1f}",
+                "Change vs present [%]": round(100 * (med[r] / present_median[r] - 1), 1),
             })
     return pd.DataFrame(rows).set_index(["Group", "T [years]"])
