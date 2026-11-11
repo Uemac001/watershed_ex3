@@ -9,6 +9,7 @@ data/*
 !WeaGETS/Ex3-WeaGETS/GSTEIG_WEAGETS_IN.mat
 !data/GSTEIG_O1_D2_OUT.mat
 !data/GSTEIG_O2_D2_OUT.mat
+!data/README.md
 
 # Python
 __pycache__/
