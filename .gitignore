@@ -1,10 +1,14 @@
-# Data is not tracked: observed input (*.mat, zip) stays local,
-# WeaGETS output and future climate CSVs can be reproduced with the scripts
+# Data is not tracked, except the .mat files the notebooks need, so that
+# they run without MATLAB. Other WeaGETS outputs and the future climate CSVs
+# can be reproduced with the scripts.
 Data_
-data
+data/*
 *.mat
 *.csv
 *.zip
+!WeaGETS/Ex3-WeaGETS/GSTEIG_WEAGETS_IN.mat
+!data/GSTEIG_O1_D2_OUT.mat
+!data/GSTEIG_O2_D2_OUT.mat
 
 # Python
 __pycache__/
